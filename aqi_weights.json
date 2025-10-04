@@ -1,0 +1,15 @@
+{
+    "weights": {
+        "AvgTemperature_C": 0.2509273903968279,
+        "O3_Temp_Interaction": 0.14416889942483196,
+        "TrafficIndex": 0.11098127188121781,
+        "WindDispersion": 0.10471040466040553,
+        "O3_ppb": 0.09841343558015632,
+        "AvgWindSpeed_m_s": 0.09179250366369725,
+        "CO_Traffic_Interaction": 0.05867626765422134,
+        "NO2_Traffic_Interaction": 0.055862531191406856,
+        "AvgPrecipitation_mm": 0.03211313511064541,
+        "CO_ppm": 0.02699248446161053,
+        "NO2_ppb": 0.02536167597497914
+    }
+}
