@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirQualityAI - Прогноз качества воздуха</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .tab-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading {
+            background: white;
+            padding: 3rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .card-full {
+            grid-column: 1 / -1;
+        }
+
+        .profile-inputs {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+        }
+
+        .profile-inputs label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .profile-inputs input[type="number"] {
+            width: 80px;
+            padding: 0.5rem;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .profile-inputs input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .aqi-card {
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .aqi-good { background: linear-gradient(135deg, #00e400, #00b300); }
+        .aqi-moderate { background: linear-gradient(135deg, #ffff00, #ffd700); color: #333; }
+        .aqi-unhealthy-sensitive { background: linear-gradient(135deg, #ff7e00, #ff5500); }
+        .aqi-unhealthy { background: linear-gradient(135deg, #ff0000, #cc0000); }
+        .aqi-very-unhealthy { background: linear-gradient(135deg, #8f3f97, #6a1b9a); }
+
+        .aqi-card h2 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .forecast-card {
+            background: #f9f9f9;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .forecast-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .forecast-time {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .forecast-aqi {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .forecast-pm25 {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .trend-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .trend-improving {
+            background: #00e400;
+            color: white;
+        }
+
+        .trend-stable {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .trend-worsening {
+            background: #ff0000;
+            color: white;
+        }
+
+        #forecastChart {
+            max-height: 400px;
+        }
+
+        .advice-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .advice-section li {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: #f5f5f5;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-size: 0.95rem;
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 12px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .demo-mode {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: white;
+            opacity: 0.8;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🌍 AirQualityAI</h1>
+        <p class="subtitle">Персональный прогноз качества воздуха с ML</p>
+    </header>
+
+    <div class="container">
+        <div class="demo-mode" id="demoMode">
+            <strong>⚠️ DEMO MODE:</strong> Используются синтетические данные. Для реальных данных запустите backend.
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Определяем ваше местоположение...</p>
+        </div>
+
+        <div id="content" class="hidden">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="app.switchTab('current')">
+                    📊 Сейчас
+                </button>
+                <button class="tab-btn" onclick="app.switchTab('forecast')">
+                    🔮 Прогноз
+                </button>
+                <button class="tab-btn" onclick="app.switchTab('map')">
+                    🗺️ Карта
+                </button>
+            </div>
+
+            <!-- Current Tab -->
+            <div id="currentTab" class="tab-content active">
+                <div class="content">
+                    <div class="card">
+                        <h3>👤 Ваш профиль</h3>
+                        <div class="profile-inputs">
+                            <label>
+                                Возраст:
+                                <input type="number" id="age" value="30" min="1" max="120">
+                            </label>
+                            <label>
+                                <input type="checkbox" id="asthma">
+                                У меня астма
+                            </label>
+                        </div>
+                        <button class="btn btn-primary" onclick="app.getPrediction()">
+                            🔄 Обновить данные
+                        </button>
+                    </div>
+
+                    <div class="card">
+                        <div id="currentAqi"></div>
+                    </div>
+
+                    <div class="card card-full">
+                        <h3>💡 Персональные рекомендации</h3>
+                        <div class="advice-section">
+                            <ul id="adviceList"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forecast Tab -->
+            <div id="forecastTab" class="tab-content">
+                <div class="card card-full">
+                    <h3>📈 График прогноза на 3 дня</h3>
+                    <canvas id="forecastChart"></canvas>
+                </div>
+
+                <div class="card card-full">
+                    <h3>🔮 Детальный прогноз</h3>
+                    <div id="forecastGrid" class="forecast-grid"></div>
+                </div>
+            </div>
+
+            <!-- Map Tab -->
+            <div id="mapTab" class="tab-content">
+                <div class="card card-full">
+                    <h3>📍 Карта качества воздуха</h3>
+                    <div id="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>AirQualityAI v2.0 | Прогнозирование с использованием Random Forest</p>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        const app = {
+            location: null,
+            prediction: null,
+            forecasts: null,
+            map: null,
+            chart: null,
+            backendUrl: 'http://localhost:8000',
+            demoMode: true,
+            currentTab: 'current',
+
+            init() {
+                this.checkBackend();
+                this.requestLocation();
+            },
+
+            async checkBackend() {
+                try {
+                    const response = await fetch(`${this.backendUrl}/health`, {
+                        method: 'GET',
+                        signal: AbortSignal.timeout(2000)
+                    });
+                    if (response.ok) {
+                        this.demoMode = false;
+                        document.getElementById('demoMode').style.display = 'none';
+                        console.log('✅ Backend connected');
+                    }
+                } catch (e) {
+                    this.demoMode = true;
+                    console.log('⚠️ Backend not available, using demo mode');
+                }
+            },
+
+            requestLocation() {
+                if (!navigator.geolocation) {
+                    alert('Геолокация не поддерживается');
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        this.location = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                        document.getElementById('loading').classList.add('hidden');
+                        document.getElementById('content').classList.remove('hidden');
+                        this.getPrediction();
+                        this.getForecast();
+                        this.initMap();
+                    },
+                    (err) => {
+                        alert('Не удалось определить местоположение');
+                        console.error(err);
+                    }
+                );
+            },
+
+            async getPrediction() {
+                if (!this.location) return;
+
+                const profile = {
+                    age: parseInt(document.getElementById('age').value),
+                    asthma: document.getElementById('asthma').checked
+                };
+
+                if (this.demoMode) {
+                    this.prediction = this.generateDemoPrediction(profile);
+                    this.displayCurrentAQI();
+                } else {
+                    try {
+                        const response = await fetch(`${this.backendUrl}/predict`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lat: this.location.lat,
+                                lon: this.location.lon,
+                                timestamp: new Date().toISOString(),
+                                profile: profile
+                            })
+                        });
+
+                        if (!response.ok) throw new Error('Backend error');
+                        this.prediction = await response.json();
+                        this.displayCurrentAQI();
+                    } catch (err) {
+                        console.error(err);
+                        this.demoMode = true;
+                        this.prediction = this.generateDemoPrediction(profile);
+                        this.displayCurrentAQI();
+                    }
+                }
+            },
+
+            async getForecast() {
+                if (!this.location) return;
+
+                if (this.demoMode) {
+                    this.forecasts = this.generateDemoForecast();
+                    this.displayForecast();
+                } else {
+                    try {
+                        const response = await fetch(`${this.backendUrl}/forecast`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lat: this.location.lat,
+                                lon: this.location.lon
+                            })
+                        });
+
+                        if (!response.ok) throw new Error('Backend error');
+                        const data = await response.json();
+                        this.forecasts = data.forecasts;
+                        this.displayForecast();
+                    } catch (err) {
+                        console.error(err);
+                        this.forecasts = this.generateDemoForecast();
+                        this.displayForecast();
+                    }
+                }
+            },
+
+            generateDemoPrediction(profile) {
+                const pm25 = 15 + Math.random() * 40;
+                const aqi = this.calculateAQI(pm25);
+                const advice = this.generateAdvice(aqi, profile);
+
+                return {
+                    pm25: pm25.toFixed(2),
+                    aqi: aqi,
+                    confidence: 0.75,
+                    advice: advice,
+                    location: this.location
+                };
+            },
+
+            generateDemoForecast() {
+                const forecasts = [];
+                const basePM25 = 15 + Math.random() * 20;
+                const hours = [1, 3, 6, 12, 24, 48, 72];
+
+                hours.forEach(h => {
+                    const now = new Date();
+                    const future = new Date(now.getTime() + h * 60 * 60 * 1000);
+                    
+                    // Добавляем вариативность
+                    const hourPattern = Math.sin(h / 6) * 5;
+                    const pm25 = Math.max(5, basePM25 + hourPattern + (Math.random() - 0.5) * 10);
+                    const aqi = this.calculateAQI(pm25);
+                    
+                    const trend = pm25 > basePM25 + 3 ? 'worsening' : 
+                                  pm25 < baseMP25 - 3 ? 'improving' : 'stable';
+
+                    forecasts.push({
+                        hours_ahead: h,
+                        timestamp: future.toISOString(),
+                        readable_time: this.formatTime(future, h),
+                        pm25: pm25.toFixed(2),
+                        aqi: aqi,
+                        confidence: Math.max(0.4, 0.9 - h / 100),
+                        trend: trend
+                    });
+                });
+
+                return forecasts;
+            },
+
+            formatTime(date, hoursAhead) {
+                if (hoursAhead < 24) {
+                    return `Через ${hoursAhead}ч (${date.getHours()}:00)`;
+                } else {
+                    const days = Math.floor(hoursAhead / 24);
+                    return `Через ${days}д (${date.toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'})})`;
+                }
+            },
+
+            calculateAQI(pm25) {
+                if (pm25 <= 12) return Math.round(50 * pm25 / 12);
+                if (pm25 <= 35.4) return Math.round(50 + (100 - 50) * (pm25 - 12) / (35.4 - 12));
+                if (pm25 <= 55.4) return Math.round(100 + (150 - 100) * (pm25 - 35.4) / (55.4 - 35.4));
+                if (pm25 <= 150.4) return Math.round(150 + (200 - 150) * (pm25 - 55.4) / (150.4 - 55.4));
+                return Math.min(500, Math.round(200 + (300 - 200) * (pm25 - 150.4) / (250.4 - 150.4)));
+            },
+
+            generateAdvice(aqi, profile) {
+                const advice = [];
+                if (aqi <= 50) {
+                    advice.push('✅ Отличное качество воздуха! Идеально для активностей на улице.');
+                } else if (aqi <= 100) {
+                    advice.push('🟡 Умеренное качество. Большинству людей можно не беспокоиться.');
+                    if (profile.asthma) {
+                        advice.push('⚠️ При астме следите за симптомами.');
+                    }
+                } else if (aqi <= 150) {
+                    advice.push('🟠 Нездоровый уровень для чувствительных групп.');
+                    if (profile.asthma || profile.age > 65) {
+                        advice.push('⚠️ Ограничьте время на улице.');
+                    }
+                } else {
+                    advice.push('🔴 Высокое загрязнение! Избегайте нагрузок на улице.');
+                    if (profile.asthma) {
+                        advice.push('🚨 Критично для астматиков! Оставайтесь дома.');
+                    }
+                }
+                return advice;
+            },
+
+            displayCurrentAQI() {
+                if (!this.prediction) return;
+
+                const aqiClass = this.getAQIClass(this.prediction.aqi);
+                const aqiLevel = this.getAQILevel(this.prediction.aqi);
+
+                document.getElementById('currentAqi').innerHTML = `
+                    <div class="aqi-card ${aqiClass}">
+                        <h2>AQI: ${this.prediction.aqi}</h2>
+                        <p style="font-size: 1.3rem; margin: 0.5rem 0;">
+                            PM2.5: ${this.prediction.pm25} μg/m³
+                        </p>
+                        <p style="opacity: 0.9;">${aqiLevel.text}</p>
+                    </div>
+                `;
+
+                const adviceHTML = this.prediction.advice.map(adv => `<li>${adv}</li>`).join('');
+                document.getElementById('adviceList').innerHTML = adviceHTML;
+            },
+
+            displayForecast() {
+                if (!this.forecasts || this.forecasts.length === 0) return;
+
+                // Отображение карточек прогноза
+                const gridHTML = this.forecasts.map(f => {
+                    const aqiClass = this.getAQIClass(f.aqi);
+                    const trendClass = `trend-${f.trend}`;
+                    const trendText = {
+                        'improving': '📉 Улучшение',
+                        'stable': '➡️ Стабильно',
+                        'worsening': '📈 Ухудшение'
+                    }[f.trend];
+
+                    return `
+                        <div class="forecast-card">
+                            <div class="forecast-time">${f.readable_time}</div>
+                            <div class="forecast-aqi ${aqiClass}" style="color: ${this.getAQILevel(f.aqi).color}">
+                                ${f.aqi}
+                            </div>
+                            <div class="forecast-pm25">PM2.5: ${f.pm25}</div>
+                            <div class="trend-badge ${trendClass}">${trendText}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('forecastGrid').innerHTML = gridHTML;
+
+                // Отображение графика
+                this.displayChart();
+            },
+
+            displayChart() {
+                if (!this.forecasts) return;
+
+                const ctx = document.getElementById('forecastChart');
+                
+                // Уничтожаем старый график если существует
+                if (this.chart) {
+                    this.chart.destroy();
+                }
+
+                const labels = this.forecasts.map(f => f.readable_time);
+                const aqiData = this.forecasts.map(f => f.aqi);
+                const pm25Data = this.forecasts.map(f => parseFloat(f.pm25));
+
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'AQI',
+                                data: aqiData,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'PM2.5 (μg/m³)',
+                                data: pm25Data,
+                                borderColor: '#ff7e00',
+                                backgroundColor: 'rgba(255, 126, 0, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'AQI'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'PM2.5 (μg/m³)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+
+            getAQIClass(aqi) {
+                if (aqi <= 50) return 'aqi-good';
+                if (aqi <= 100) return 'aqi-moderate';
+                if (aqi <= 150) return 'aqi-unhealthy-sensitive';
+                if (aqi <= 200) return 'aqi-unhealthy';
+                return 'aqi-very-unhealthy';
+            },
+
+            getAQILevel(aqi) {
+                if (aqi <= 50) return { text: 'Хорошо', color: '#00e400' };
+                if (aqi <= 100) return { text: 'Умеренно', color: '#ffff00' };
+                if (aqi <= 150) return { text: 'Нездорово для чувствительных', color: '#ff7e00' };
+                if (aqi <= 200) return { text: 'Нездорово', color: '#ff0000' };
+                return { text: 'Очень нездорово', color: '#8f3f97' };
+            },
+
+            initMap() {
+                if (this.map) return;
+
+                this.map = L.map('map').setView([this.location.lat, this.location.lon], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(this.map);
+
+                this.updateMap();
+            },
+
+            updateMap() {
+                if (!this.map || !this.prediction) return;
+
+                const aqiLevel = this.getAQILevel(this.prediction.aqi);
+
+                const circle = L.circle([this.location.lat, this.location.lon], {
+                    color: aqiLevel.color,
+                    fillColor: aqiLevel.color,
+                    fillOpacity: 0.3,
+                    radius: 3000
+                }).addTo(this.map);
+
+                const marker = L.marker([this.location.lat, this.location.lon]).addTo(this.map);
+
+                const popupContent = `
+                    <b>Ваше местоположение</b><br>
+                    AQI: ${this.prediction.aqi} (${aqiLevel.text})<br>
+                    PM2.5: ${this.prediction.pm25} μg/m³
+                `;
+                marker.bindPopup(popupContent).openPopup();
+            },
+
+            switchTab(tab) {
+                // Скрываем все табы
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+                // Показываем выбранный таб
+                document.getElementById(`${tab}Tab`).classList.add('active');
+                event.target.classList.add('active');
+
+                this.currentTab = tab;
+
+                // Инициализируем карту при первом открытии
+                if (tab === 'map' && !this.map) {
+                    setTimeout(() => this.initMap(), 100);
+                }
+
+                // Обновляем график при открытии прогноза
+                if (tab === 'forecast' && this.forecasts) {
+                    setTimeout(() => this.displayChart(), 100);
+                }
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
