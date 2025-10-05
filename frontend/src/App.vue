@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <header class="header">
-      <h1>🌍 AirQualityAI</h1>
+      <h1>aua</h1>
       <p class="subtitle">Персональный мониторинг качества воздуха</p>
     </header>
 

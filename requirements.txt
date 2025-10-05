@@ -1,42 +1,24 @@
-numpy 
-pandas 
-scikit-learn 
-matplotlib 
-joblib
-requests 
-openmeteo-py 
-opencage 
-geopy
-geopandas 
-shapely 
-folium
-fastapi
-uvicorn
-plotly 
-dash
-xgboost 
-lightgbm
-torch
+# Core dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
-scikit-learn==1.3.2
-pandas==2.1.3
-numpy==1.26.2
-joblib==1.3.2
-requests==2.31.0
-geopy==2.4.1
-geopandas==0.14.1
-shapely==2.0.2
-folium==0.15.0
-python-multipart==0.0.6
 python-dotenv==1.0.0
-cartopy
-harmony-py
-matplotlib
-numpy
-xarray
-netCDF4 
-h5py 
-numpy 
-pandas
+
+# HTTP clients
+requests==2.31.0
+aiohttp==3.9.1
+
+# Data science
+numpy==1.24.3
+pandas==2.0.3
+scikit-learn==1.3.2
+joblib==1.3.2
+
+# NASA data
+netCDF4==1.6.4
+
+# Async support
+asyncio-mqtt==0.16.1
+
+# CORS
+python-multipart==0.0.6

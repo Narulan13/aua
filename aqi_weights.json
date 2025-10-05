@@ -1,15 +1,36 @@
 {
-    "weights": {
-        "AvgTemperature_C": 0.2509273903968279,
-        "O3_Temp_Interaction": 0.14416889942483196,
-        "TrafficIndex": 0.11098127188121781,
-        "WindDispersion": 0.10471040466040553,
-        "O3_ppb": 0.09841343558015632,
-        "AvgWindSpeed_m_s": 0.09179250366369725,
-        "CO_Traffic_Interaction": 0.05867626765422134,
-        "NO2_Traffic_Interaction": 0.055862531191406856,
-        "AvgPrecipitation_mm": 0.03211313511064541,
-        "CO_ppm": 0.02699248446161053,
-        "NO2_ppb": 0.02536167597497914
-    }
+  "weights": {
+    "AvgTemperature_C": 0.3136242716508281,
+    "AvgWindSpeed_m_s": 0.19290363967260454,
+    "AvgPrecipitation_mm": 0.04515801087385173,
+    "CO_ppm": 0.0867827883116111,
+    "NO2_ppb": 0.08317069297161932,
+    "O3_ppb": 0.12086768475803768,
+    "TrafficIndex": 0.15749291176144747
+  },
+  "feature_names": [
+    "AvgTemperature_C",
+    "AvgWindSpeed_m_s",
+    "AvgPrecipitation_mm",
+    "CO_ppm",
+    "NO2_ppb",
+    "O3_ppb",
+    "TrafficIndex"
+  ],
+  "metrics": {
+    "train_r2": 0.7610196532878911,
+    "test_r2": 0.278103570175958,
+    "train_rmse": 9.461396155326812,
+    "test_rmse": 17.249869107719945,
+    "train_mae": 5.865919216491712,
+    "test_mae": 11.06843412502407,
+    "n_samples": 5718,
+    "trained_at": "2025-10-05T20:59:14.462643"
+  },
+  "model_params": {
+    "n_estimators": 300,
+    "max_depth": 20,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2
+  }
 }
