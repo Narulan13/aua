@@ -1,5 +1,7 @@
 from typing import List
 from datetime import datetime
+from app.fetchers.base import DataFetcher
+from app.models import GeoLocation, AirQualitySnapshot
 
 
 class AirQualityAggregator:
@@ -37,7 +39,6 @@ class AirQualityAggregator:
         if pm25 is None:
             return 50
         
-        # US EPA AQI calculation for PM2.5
         if pm25 <= 12.0:
             return int((50 / 12.0) * pm25)
         elif pm25 <= 35.4:
@@ -50,4 +51,3 @@ class AirQualityAggregator:
             return int(200 + ((300 - 200) / (250.4 - 150.4)) * (pm25 - 150.4))
         else:
             return int(300 + ((500 - 300) / (500.4 - 250.4)) * (pm25 - 250.4))
-

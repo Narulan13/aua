@@ -1,4 +1,8 @@
 import requests
+from typing import List, Optional
+from datetime import datetime
+from base import DataFetcher
+from models import GeoLocation, Measurement, DataSource, PollutantType
 
 
 class OpenAQFetcher(DataFetcher):
@@ -10,7 +14,7 @@ class OpenAQFetcher(DataFetcher):
         try:
             params = {
                 'coordinates': f"{location.latitude},{location.longitude}",
-                'radius': 25000,  # 25km radius
+                'radius': 25000,
                 'limit': 100,
                 'order_by': 'datetime',
                 'sort': 'desc'
@@ -46,14 +50,25 @@ class OpenAQFetcher(DataFetcher):
                 for m in result.get('measurements', []):
                     param = m.get('parameter', '').lower()
                     if param in pollutant_map:
-                        measurements.append(Measurement(
-                            pollutant=pollutant_map[param],
-                            value=m.get('value', 0),
-                            unit=m.get('unit', 'µg/m³'),
-                            timestamp=datetime.fromisoformat(m.get('lastUpdated', '').replace('Z', '+00:00')),
-                            source=DataSource.OPENAQ,
-                            confidence=0.9
-                        ))
+                        try:
+                            timestamp_str = m.get('lastUpdated', '')
+                            if timestamp_str:
+                                timestamp_str = timestamp_str.replace('Z', '+00:00')
+                                timestamp = datetime.fromisoformat(timestamp_str)
+                            else:
+                                timestamp = datetime.now()
+                            
+                            measurements.append(Measurement(
+                                pollutant=pollutant_map[param],
+                                value=m.get('value', 0),
+                                unit=m.get('unit', 'µg/m³'),
+                                timestamp=timestamp,
+                                source=DataSource.OPENAQ,
+                                confidence=0.9
+                            ))
+                        except Exception as e:
+                            print(f"Error parsing: {e}")
+                            continue
             
             return measurements
             

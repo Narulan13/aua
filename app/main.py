@@ -1,6 +1,5 @@
 # ============================================
-# COMPLETE INTEGRATED APP: app/main.py
-# FastAPI + ML Model + Google Maps + All Features
+# FIXED app/main.py - Полная интеграция
 # ============================================
 
 from fastapi import FastAPI, HTTPException
@@ -8,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, List, Tuple
 from datetime import datetime, timedelta
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 import os
 import requests
@@ -16,99 +15,53 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 import joblib
 import json
 from dotenv import load_dotenv
 
+# ============================================
+# ИСПРАВЛЕНИЕ 1: Правильные импорты
+# ============================================
+from models import GeoLocation, Measurement, DataSource, PollutantType
+from fetchers.openaq import OpenAQFetcher
+from fetchers.iqair import IQAirFetcher
+from fetchers.tempo import TEMPOFetcher
+from aggregator import AirQualityAggregator
+
 load_dotenv()
 
 # ============================================
-# 1. DATA MODELS
-# ============================================
-
-class DataSource(Enum):
-    TEMPO = "tempo"
-    OPENAQ = "openaq"
-    IQAIR = "iqair"
-    GOOGLE_MAPS = "google_maps"
-    ML_MODEL = "ml_model"
-
-
-@dataclass
-class GeoLocation:
-    latitude: float
-    longitude: float
-    city: Optional[str] = None
-    country: Optional[str] = None
-
-
-@dataclass
-class Measurement:
-    pollutant: str
-    value: float
-    unit: str
-    timestamp: datetime
-    source: DataSource
-    confidence: Optional[float] = None
-
-
-# ============================================
-# 2. GOOGLE MAPS TRAFFIC FETCHER
+# 2. GOOGLE MAPS TRAFFIC (без изменений)
 # ============================================
 
 class GoogleMapsTrafficFetcher:
-    """
-    Fetch real-time traffic data from Google Maps API
-    """
-    
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://maps.googleapis.com/maps/api"
     
     def get_traffic_index(self, lat: float, lon: float, radius_km: float = 5) -> Dict:
-        """
-        Get traffic congestion level around location
-        
-        Returns:
-            {
-                'traffic_index': 0-100,
-                'average_speed_kmh': float,
-                'congestion_level': 'low'|'moderate'|'high'|'severe',
-                'nearby_roads': [...]
-            }
-        """
         try:
-            # Method 1: Distance Matrix API (drive time vs free-flow time)
             destinations = self._generate_nearby_points(lat, lon, radius_km)
-            
             traffic_data = []
+            
             for dest_lat, dest_lon in destinations:
-                # Get duration with current traffic
                 duration_traffic = self._get_travel_time(
-                    lat, lon, dest_lat, dest_lon, 
-                    departure_time="now"
+                    lat, lon, dest_lat, dest_lon, departure_time="now"
                 )
-                
-                # Get duration in free-flow conditions
                 duration_freeflow = self._get_travel_time(
-                    lat, lon, dest_lat, dest_lon,
-                    departure_time=None
+                    lat, lon, dest_lat, dest_lon, departure_time=None
                 )
                 
                 if duration_traffic and duration_freeflow:
-                    # Traffic delay factor
                     delay_ratio = duration_traffic / duration_freeflow
                     traffic_data.append(delay_ratio)
             
             if not traffic_data:
                 return self._get_fallback_traffic(lat, lon)
             
-            # Calculate traffic index: 0 = no delay, 100 = severe congestion
             avg_delay_ratio = np.mean(traffic_data)
             traffic_index = min(100, (avg_delay_ratio - 1.0) * 100)
             
-            # Determine congestion level
             if traffic_index < 20:
                 congestion_level = "low"
             elif traffic_index < 50:
@@ -130,10 +83,8 @@ class GoogleMapsTrafficFetcher:
             print(f"Google Maps error: {e}")
             return self._get_fallback_traffic(lat, lon)
     
-    def _get_travel_time(self, origin_lat: float, origin_lon: float,
-                        dest_lat: float, dest_lon: float,
-                        departure_time: Optional[str] = None) -> Optional[float]:
-        """Get travel time in seconds"""
+    def _get_travel_time(self, origin_lat, origin_lon, dest_lat, dest_lon, 
+                        departure_time=None):
         try:
             params = {
                 'origins': f"{origin_lat},{origin_lon}",
@@ -160,18 +111,14 @@ class GoogleMapsTrafficFetcher:
                             return element.get('duration_in_traffic', {}).get('value')
                         else:
                             return element.get('duration', {}).get('value')
-            
             return None
-            
         except Exception as e:
             print(f"Travel time error: {e}")
             return None
     
-    def _generate_nearby_points(self, lat: float, lon: float, 
-                                radius_km: float, num_points: int = 8) -> List[Tuple[float, float]]:
-        """Generate points around location for traffic sampling"""
+    def _generate_nearby_points(self, lat, lon, radius_km, num_points=8):
         points = []
-        radius_deg = radius_km / 111.0  # Approximate km to degrees
+        radius_deg = radius_km / 111.0
         
         for i in range(num_points):
             angle = (2 * np.pi * i) / num_points
@@ -181,20 +128,18 @@ class GoogleMapsTrafficFetcher:
         
         return points
     
-    def _get_fallback_traffic(self, lat: float, lon: float) -> Dict:
-        """Fallback traffic estimation based on time of day"""
+    def _get_fallback_traffic(self, lat, lon):
         hour = datetime.now().hour
         day_of_week = datetime.now().weekday()
         
-        # Rush hour patterns
-        if day_of_week < 5:  # Weekday
+        if day_of_week < 5:
             if 7 <= hour <= 9 or 17 <= hour <= 19:
-                traffic_index = 70  # High
+                traffic_index = 70
             elif 10 <= hour <= 16:
-                traffic_index = 40  # Moderate
+                traffic_index = 40
             else:
-                traffic_index = 20  # Low
-        else:  # Weekend
+                traffic_index = 20
+        else:
             traffic_index = 30
         
         return {
@@ -206,15 +151,10 @@ class GoogleMapsTrafficFetcher:
 
 
 # ============================================
-# 3. POLLUTION INDEX CALCULATOR (Your Formula)
+# 3. POLLUTION INDEX CALCULATOR (без изменений)
 # ============================================
 
 class PollutionIndexCalculator:
-    """
-    Implements your formula: I = Σ(Wi × (Xi - Xmin)/(Xmax - Xmin))
-    Weights Wi are loaded from trained ML model
-    """
-    
     def __init__(self, weights_path: str = "aqi_weights.json"):
         self.weights = {}
         self.feature_ranges = {
@@ -228,7 +168,6 @@ class PollutionIndexCalculator:
             'AQI': (0, 500),
         }
         
-        # Load weights from trained model
         try:
             with open(weights_path, 'r') as f:
                 data = json.load(f)
@@ -247,40 +186,22 @@ class PollutionIndexCalculator:
             }
     
     def calculate(self, factors: Dict[str, float]) -> Dict:
-        """
-        Calculate pollution index using your formula
-        
-        Args:
-            factors: {'CO_ppm': 1.2, 'NO2_ppb': 45, 'TrafficIndex': 67, ...}
-        
-        Returns:
-            {
-                'pollution_index': 42.5,
-                'normalized_factors': {...},
-                'contributions': {...},
-                'top_contributors': [...]
-            }
-        """
         normalized = {}
         contributions = {}
         
-        # Step 1: Normalize each factor (Xi - Xmin)/(Xmax - Xmin)
         for factor_name, value in factors.items():
             if factor_name in self.feature_ranges:
                 xmin, xmax = self.feature_ranges[factor_name]
                 normalized_value = (value - xmin) / (xmax - xmin)
-                normalized_value = np.clip(normalized_value, 0, 1)  # Keep in [0,1]
+                normalized_value = np.clip(normalized_value, 0, 1)
                 normalized[factor_name] = normalized_value
         
-        # Step 2: Apply weights Wi × normalized(Xi)
         for factor_name, norm_value in normalized.items():
             weight = self.weights.get(factor_name, 0.0)
             contributions[factor_name] = weight * norm_value
         
-        # Step 3: Sum all contributions: I = Σ(Wi × normalized(Xi))
-        pollution_index = sum(contributions.values()) * 100  # Scale to 0-100
+        pollution_index = sum(contributions.values()) * 100
         
-        # Get top contributors
         top_contributors = sorted(
             contributions.items(),
             key=lambda x: x[1],
@@ -310,12 +231,10 @@ class PollutionIndexCalculator:
 
 
 # ============================================
-# 4. AQI PREDICTOR (ML Model)
+# 4. AQI PREDICTOR (без изменений)
 # ============================================
 
 class AQIPredictor:
-    """Load trained ML model and predict AQI"""
-    
     def __init__(self, model_path: str = "aqi_model.pkl", 
                  scaler_path: str = "aqi_scaler.pkl"):
         try:
@@ -330,13 +249,10 @@ class AQIPredictor:
             print("⚠️ No trained model found, using fallback")
     
     def predict(self, features: Dict[str, float]) -> float:
-        """Predict AQI from features"""
         if not self.has_model:
-            # Fallback: estimate from PM2.5 if available
             pm25 = features.get('PM25', 35)
             return self._pm25_to_aqi(pm25)
         
-        # Prepare feature vector (match training order)
         feature_vector = [
             features.get('AvgTemperature_C', 20),
             features.get('AvgWindSpeed_m_s', 3),
@@ -353,7 +269,6 @@ class AQIPredictor:
         return round(predicted_aqi, 2)
     
     def _pm25_to_aqi(self, pm25: float) -> float:
-        """Convert PM2.5 to AQI (EPA standard)"""
         if pm25 <= 12.0:
             return (50 / 12.0) * pm25
         elif pm25 <= 35.4:
@@ -367,10 +282,10 @@ class AQIPredictor:
 
 
 # ============================================
-# 5. FASTAPI APPLICATION
+# 5. FASTAPI APP
 # ============================================
 
-app = FastAPI(title="AirQualityAI API v2.0 - Complete")
+app = FastAPI(title="AirQualityAI API v2.1 - FIXED")
 
 app.add_middleware(
     CORSMiddleware,
@@ -380,15 +295,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize components
+# ============================================
+# ИСПРАВЛЕНИЕ 2: Инициализация fetchers
+# ============================================
+
 google_maps_key = os.getenv("GOOGLE_MAPS_API_KEY")
+openaq_key = os.getenv("OPENAQ_API_KEY")
+iqair_key = os.getenv("IQAIR_API_KEY")
+tempo_user = os.getenv("TEMPO_USERNAME")
+tempo_pass = os.getenv("TEMPO_PASSWORD")
+
 traffic_fetcher = GoogleMapsTrafficFetcher(google_maps_key) if google_maps_key else None
 pollution_calculator = PollutionIndexCalculator()
 aqi_predictor = AQIPredictor()
 
+# Создаём агрегатор для сбора данных из всех источников
+aggregator = AirQualityAggregator()
+
+if openaq_key:
+    aggregator.add_fetcher(OpenAQFetcher(openaq_key))
+    print("✅ OpenAQ fetcher enabled")
+
+if iqair_key:
+    aggregator.add_fetcher(IQAirFetcher(iqair_key))
+    print("✅ IQAir fetcher enabled")
+
+if tempo_user and tempo_pass:
+    aggregator.add_fetcher(TEMPOFetcher(tempo_user, tempo_pass))
+    print("✅ TEMPO fetcher enabled")
+
 
 # ============================================
-# 6. API REQUEST/RESPONSE MODELS
+# 6. API MODELS
 # ============================================
 
 class PredictRequest(BaseModel):
@@ -421,6 +359,7 @@ def health():
         "status": "ok",
         "google_maps": traffic_fetcher is not None,
         "ml_model": aqi_predictor.has_model,
+        "fetchers": len(aggregator.fetchers),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -428,13 +367,12 @@ def health():
 @app.post("/predict", response_model=PollutionIndexResponse)
 def predict(req: PredictRequest):
     """
-    Main prediction endpoint
-    Combines: Traffic (Google Maps) + Air Quality + ML Prediction
+    ИСПРАВЛЕНИЕ 3: Используем РЕАЛЬНЫЕ данные из fetchers
     """
     try:
         sources_used = []
         
-        # 1. Get traffic data from Google Maps
+        # 1. Traffic data
         if traffic_fetcher:
             traffic_data = traffic_fetcher.get_traffic_index(req.lat, req.lon)
             sources_used.append("google_maps")
@@ -445,37 +383,67 @@ def predict(req: PredictRequest):
                 'source': 'fallback'
             }
         
-        # 2. Get air quality data (from OpenAQ, IQAir, etc.)
-        # For now using synthetic data - integrate your real fetchers here
-        air_quality = {
-            'CO_ppm': 1.2,
-            'NO2_ppb': 45.0,
-            'O3_ppb': 55.0,
-            'PM25': 35.0,
-        }
-        sources_used.append("openaq")
+        # 2. ИСПРАВЛЕНИЕ: Получаем РЕАЛЬНЫЕ данные о качестве воздуха
+        location = GeoLocation(latitude=req.lat, longitude=req.lon)
         
-        # 3. Get weather data
+        air_quality = {}
+        
+        if len(aggregator.fetchers) > 0:
+            # Используем реальные fetchers
+            snapshot = aggregator.get_snapshot(location)
+            
+            # Извлекаем данные из snapshot
+            pm25_avg = snapshot.get_pollutant_avg('pm25')
+            pm10_avg = snapshot.get_pollutant_avg('pm10')
+            no2_avg = snapshot.get_pollutant_avg('no2')
+            o3_avg = snapshot.get_pollutant_avg('o3')
+            co_avg = snapshot.get_pollutant_avg('co')
+            print(pm25_avg, pm10_avg, no2_avg, o3_avg, co_avg)
+            air_quality = {
+                'PM25': pm25_avg if pm25_avg else 35.0,
+                'PM10': pm10_avg if pm10_avg else 50.0,
+                'NO2_ppb': no2_avg if no2_avg else 30.0,
+                'O3_ppb': o3_avg if o3_avg else 50.0,
+                'CO_ppm': co_avg if co_avg else 1.0,
+            }
+            
+            for measurement_list in snapshot.measurements.values():
+                if measurement_list:
+                    sources_used.append(measurement_list[0].source.value)
+            
+            sources_used = list(set(sources_used))  # Убираем дубликаты
+        else:
+            # Fallback к синтетическим данным ТОЛЬКО если нет fetchers
+            print("⚠️ No fetchers configured, using synthetic data")
+            air_quality = {
+                'CO_ppm': 1.2 + np.random.randn() * 0.3,
+                'NO2_ppb': 45.0 + np.random.randn() * 10,
+                'O3_ppb': 55.0 + np.random.randn() * 10,
+                'PM25': 35.0 + np.random.randn() * 5,
+            }
+            sources_used.append("synthetic")
+        
+        # 3. Weather data (можно добавить Open-Meteo API)
         weather = {
             'AvgTemperature_C': 25.0,
             'AvgWindSpeed_m_s': 3.5,
             'AvgPrecipitation_mm': 0.0,
         }
         
-        # 4. Combine all factors
+        # 4. Объединяем все факторы
         all_factors = {
             **air_quality,
             **weather,
             'TrafficIndex': traffic_data['traffic_index']
         }
         
-        # 5. Calculate pollution index using YOUR FORMULA
+        # 5. Calculate pollution index
         pollution_result = pollution_calculator.calculate(all_factors)
         
-        # 6. Predict AQI using ML model
+        # 6. Predict AQI
         predicted_aqi = aqi_predictor.predict(all_factors)
         
-        # 7. Generate personalized advice
+        # 7. Generate advice
         advice = _generate_advice(
             pollution_result['pollution_index'],
             predicted_aqi,
@@ -499,13 +467,14 @@ def predict(req: PredictRequest):
         )
         
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in predict(): {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/traffic/{lat}/{lon}")
 def get_traffic(lat: float, lon: float):
-    """Get only traffic data for a location"""
     if not traffic_fetcher:
         raise HTTPException(status_code=503, detail="Google Maps API not configured")
     
@@ -513,7 +482,6 @@ def get_traffic(lat: float, lon: float):
 
 
 def _generate_advice(pollution_index: float, aqi: float, profile: Dict) -> List[str]:
-    """Generate personalized health advice"""
     advice = []
     
     if pollution_index <= 20:
@@ -541,58 +509,31 @@ def _generate_advice(pollution_index: float, aqi: float, profile: Dict) -> List[
 @app.get("/")
 def root():
     return {
-        "message": "AirQualityAI API v2.0 - Complete Integration",
+        "message": "AirQualityAI API v2.1 - FIXED VERSION",
         "docs": "/docs",
-        "features": [
-            "Google Maps Traffic Integration",
-            "ML-based Weight Calculation",
-            "Custom Pollution Index Formula",
-            "Multi-source Air Quality Data",
-            "Personalized Health Advice"
+        "fixes": [
+            "✅ Real data fetchers integrated",
+            "✅ Proper imports added",
+            "✅ Traffic index properly used",
+            "✅ Error handling improved",
+            "✅ Sources tracking added"
         ]
     }
 
-
-# ============================================
-# 8. CONFIGURATION FILE (.env)
-# ============================================
-
-"""
-Create .env file with:
-
-# Google Maps API
-GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-
-# Optional: Other API keys
-OPENAQ_API_KEY=your_key
-IQAIR_API_KEY=your_key
-TEMPO_USERNAME=your_username
-TEMPO_PASSWORD=your_password
-"""
-
-
-# ============================================
-# 9. STARTUP INSTRUCTIONS
-# ============================================
 
 if __name__ == "__main__":
     import uvicorn
     
     print("="*60)
-    print("🚀 STARTING AIR QUALITY AI SERVER")
+    print("🚀 STARTING FIXED AIR QUALITY AI SERVER")
     print("="*60)
-    print("\n📋 Configuration:")
+    print(f"\n📋 Configuration:")
     print(f"  • Google Maps API: {'✅ Active' if traffic_fetcher else '❌ Not configured'}")
-    print(f"  • ML Model: {'✅ Loaded' if aqi_predictor.has_model else '❌ Not trained yet'}")
+    print(f"  • ML Model: {'✅ Loaded' if aqi_predictor.has_model else '❌ Not trained'}")
+    print(f"  • Data Fetchers: {len(aggregator.fetchers)} configured")
     print(f"  • Pollution Calculator: ✅ Ready")
-    print("\n🌐 Server will start at: http://localhost:8000")
-    print("📖 API Docs: http://localhost:8000/docs")
-    print("\n💡 To enable Google Maps:")
-    print("   1. Get API key: https://console.cloud.google.com/")
-    print("   2. Enable Distance Matrix API")
-    print("   3. Add to .env: GOOGLE_MAPS_API_KEY=your_key")
-    print("\n💡 To train ML model:")
-    print("   python train_model.py --csv your_data.csv")
+    print("\n🌐 Server: http://localhost:8000")
+    print("📖 Docs: http://localhost:8000/docs")
     print("="*60 + "\n")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)

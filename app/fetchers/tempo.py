@@ -1,7 +1,16 @@
 import requests
-import netCDF4 as nc
 import numpy as np
-from io import BytesIO
+from typing import List
+from datetime import datetime
+from app.fetchers.base import DataFetcher
+from app.models import GeoLocation, Measurement, DataSource, PollutantType
+
+try:
+    import netCDF4 as nc
+    HAS_NETCDF = True
+except ImportError:
+    HAS_NETCDF = False
+    print("⚠️ netCDF4 not installed")
 
 
 class TEMPOFetcher(DataFetcher):
@@ -11,22 +20,19 @@ class TEMPOFetcher(DataFetcher):
         self.base_url = "https://data.gesdisc.earthdata.nasa.gov/data/TEMPO_L2"
     
     def fetch(self, location: GeoLocation) -> List[Measurement]:
+        if not HAS_NETCDF:
+            return []
+        
         try:
             date_str = datetime.now().strftime("%Y%m%d")
             url = f"{self.base_url}/NO2/{date_str[:4]}/TEMPO_L2_NO2_{date_str}T1200Z.nc"
             
-            response = requests.get(
-                url, 
-                auth=(self.username, self.password),
-                timeout=30
-            )
+            response = requests.get(url, auth=(self.username, self.password), timeout=30)
             
             if response.status_code != 200:
-                print(f"TEMPO fetch failed: {response.status_code}")
                 return []
             
             ds = nc.Dataset("inmemory", memory=response.content)
-            
             lats = ds.variables['latitude'][:]
             lons = ds.variables['longitude'][:]
             no2_data = ds.variables['nitrogendioxide_tropospheric_column'][:]

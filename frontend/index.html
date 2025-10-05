@@ -552,8 +552,9 @@
                     const pm25 = Math.max(5, basePM25 + hourPattern + (Math.random() - 0.5) * 10);
                     const aqi = this.calculateAQI(pm25);
                     
+                    // ИСПРАВЛЕНО: basePM25 вместо baseMP25
                     const trend = pm25 > basePM25 + 3 ? 'worsening' : 
-                                  pm25 < baseMP25 - 3 ? 'improving' : 'stable';
+                                  pm25 < basePM25 - 3 ? 'improving' : 'stable';
 
                     forecasts.push({
                         hours_ahead: h,

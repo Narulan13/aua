@@ -1,4 +1,8 @@
 import requests
+from typing import List
+from datetime import datetime
+from app.fetchers.base import DataFetcher
+from app.models import GeoLocation, Measurement, DataSource, PollutantType
 
 
 class IQAirFetcher(DataFetcher):
@@ -26,13 +30,22 @@ class IQAirFetcher(DataFetcher):
             data = response.json().get('data', {})
             current = data.get('current', {}).get('pollution', {})
             
-            pm25_value = current.get('aqius', 0) * 0.4  # Convert AQI to µg/m³ (approximate)
+            pm25_value = current.get('aqius', 0) * 0.4
+            
+            try:
+                timestamp_str = current.get('ts', '')
+                if timestamp_str:
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                else:
+                    timestamp = datetime.now()
+            except:
+                timestamp = datetime.now()
             
             return [Measurement(
                 pollutant=PollutantType.PM25,
                 value=pm25_value,
                 unit='µg/m³',
-                timestamp=datetime.fromisoformat(current.get('ts', '').replace('Z', '+00:00')),
+                timestamp=timestamp,
                 source=DataSource.IQAIR,
                 confidence=0.85
             )]
