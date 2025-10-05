@@ -27,6 +27,15 @@ from app.fetchers.openaq import OpenAQFetcher
 from app.fetchers.iqair import IQAirFetcher
 from app.fetchers.tempo import TEMPOFetcher
 from app.aggregator import AirQualityAggregator
+from fastapi import FastAPI
+from .database import Base, engine
+from .auth import router as auth_router
+
+app = FastAPI(title="AQI App with Auth")
+
+Base.metadata.create_all(bind=engine)  # ← создаёт таблицы автоматически
+
+app.include_router(auth_router)
 
 load_dotenv()
 

@@ -1,0 +1,175 @@
+
+    :root {
+      --primary: #3a7bd5;
+      --primary-dark: #2854a1;
+      --bg: #f0f4fa;
+      --text: #222;
+      --text-light: #555;
+      --card-bg: #fff;
+      --radius: 14px;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Inter", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .header {
+      background: linear-gradient(135deg, #6bb7ff, #8b9fff);
+      color: white;
+      text-align: center;
+      padding: 3rem 1rem 4rem;
+      border-bottom-left-radius: 80px;
+      border-bottom-right-radius: 80px;
+      box-shadow: var(--shadow);
+    }
+    .header h1 {
+      font-weight: 700;
+      font-size: 2.6rem;
+      margin-bottom: 0.6rem;
+      letter-spacing: 0.5px;
+    }
+    .subtitle {
+      opacity: 0.9;
+      font-size: 1.1rem;
+    }
+    .container {
+      max-width: 1300px;
+      margin: -60px auto 2rem;
+      padding: 0 1rem;
+    }
+    .tabs {
+      display: flex;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 1rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s;
+      color: var(--text-light);
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+    .tab-btn:hover:not(.active) {
+      background: rgba(58, 123, 213, 0.08);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 900px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+    .card {
+      background: var(--card-bg);
+      padding: 1.75rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      transition: transform 0.25s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+    }
+    .card h3 {
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      color: var(--primary-dark);
+      font-weight: 600;
+    }
+    .card-full {
+      grid-column: 1 / -1;
+    }
+    .btn {
+      padding: 0.8rem 1.4rem;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+    .aqi-card {
+      border-radius: var(--radius);
+      padding: 2rem;
+      color: white;
+      box-shadow: var(--shadow);
+    }
+    .aqi-good { background: linear-gradient(135deg, #00e676, #00b248); }
+    .aqi-moderate { background: linear-gradient(135deg, #ffeb3b, #fbc02d); color: #333; }
+    .aqi-unhealthy-sensitive { background: linear-gradient(135deg, #ff9800, #ef6c00); }
+    .aqi-unhealthy { background: linear-gradient(135deg, #e53935, #b71c1c); }
+    .aqi-very-unhealthy { background: linear-gradient(135deg, #8e24aa, #6a1b9a); }
+    .aqi-card h2 {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+    }
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+      font-size: 0.9rem;
+    }
+    .loading {
+      text-align: center;
+      background: white;
+      padding: 4rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      color: var(--text-light);
+      font-size: 1.1rem;
+    }
+    .spinner {
+      border: 4px solid #e0e0e0;
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      width: 55px;
+      height: 55px;
+      margin: 0 auto 1rem;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      text-align: right;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    th {
+      text-align: left;
+      background: #f8f9fb;
+    }

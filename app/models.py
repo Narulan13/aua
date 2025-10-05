@@ -51,3 +51,21 @@ class AirQualitySnapshot:
             return None
         values = [m.value for m in self.measurements[pollutant]]
         return sum(values) / len(values) if values else None
+
+
+
+
+# --- AUTH MODELS ---
+from sqlalchemy import Column, Integer, String
+from .database import Base  # если нет — добавь путь к Base из database.py
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    year = Column(Integer)
+    family_information = Column(String)
+    health = Column(String)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
