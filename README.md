@@ -1,6 +1,6 @@
-# Aua - Air Quality Monitoring Web App
+# aua - Air Quality Monitoring Web App
 
-Aua is a comprehensive web application that provides real-time air pollution forecasts for users' specific locations. The app helps users stay informed about air quality conditions and make informed decisions to protect their health.
+aua is a comprehensive web application that provides real-time air pollution forecasts for users' specific locations. The app helps users stay informed about air quality conditions and make informed decisions to protect their health.
 
 ## Features
 
